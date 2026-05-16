@@ -1,0 +1,99 @@
+plugins {
+    id 'java-library'
+    id 'net.neoforged.moddev' version '2.0.141'
+}
+
+java {
+    toolchain {
+        languageVersion = JavaLanguageVersion.of(25)
+    }
+}
+
+version = project.mod_version
+group = 'io.github.josephosullivan.animalweights'
+
+base {
+    archivesName = project.mod_id
+}
+
+repositories {
+    mavenLocal()
+}
+
+neoForge {
+    version = project.neoforge_version
+    runs {
+        client {
+            client()
+        }
+        server {
+            server()
+        }
+        data {
+            data()
+            programArguments.addAll '--mod', project.mod_id,
+                '--all',
+                '--output', file('src/generated/resources/').getAbsolutePath(),
+                '--existing', file('src/main/resources/').getAbsolutePath()
+        }
+        gameTestServer {
+            type = "gameTestServer"
+        }
+    }
+    mods {
+        "${project.mod_id}" {
+            sourceSet sourceSets.main
+        }
+    }
+
+    unitTest {
+        enable()
+        testedMod = mods."${project.mod_id}"
+    }
+}
+
+dependencies {
+    testImplementation group: 'net.neoforged',     name: 'testframework',         version: project.neoforge_version
+    testImplementation group: 'org.junit.jupiter', name: 'junit-jupiter',         version: '5.10.3'
+    testImplementation group: 'org.junit.jupiter', name: 'junit-jupiter-params',  version: '5.10.3'
+    testRuntimeOnly    group: 'org.junit.jupiter', name: 'junit-jupiter-engine',  version: '5.10.3'
+    testRuntimeOnly    group: 'org.junit.platform', name: 'junit-platform-launcher', version: '1.10.3'
+}
+
+tasks.named('test', Test).configure {
+    useJUnitPlatform()
+    testLogging {
+        events 'failed', 'skipped'
+        exceptionFormat = 'full'
+        showCauses = true
+        showStackTraces = true
+    }
+}
+
+tasks.withType(JavaCompile).configureEach {
+    options.encoding = 'UTF-8'
+}
+
+tasks.register('integrationCheck') {
+    group = 'verification'
+    description = 'Full pre-merge: check (Tier 1 JUnit) + Tier 2 GameTest.'
+    dependsOn 'check', 'runGameTestServer'
+}
+
+tasks.named('processResources', ProcessResources).configure {
+    var replaceProperties = [
+        mod_id: project.mod_id,
+        mod_name: project.mod_name,
+        mod_version: project.mod_version,
+        mod_authors: project.mod_authors,
+        mod_license: 'MIT',
+        mod_description: 'Gives every Minecraft mob a realistic weight and surfaces it in gameplay.',
+        minecraft_version_range: project.minecraft_version_range,
+        neoforge_version_range: project.neoforge_version_range,
+        loader_version_range: '[4,)'
+    ]
+    inputs.properties replaceProperties
+    filesMatching(['META-INF/neoforge.mods.toml']) {
+        expand replaceProperties
+    }
+}

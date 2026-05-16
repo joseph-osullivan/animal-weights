@@ -1,0 +1,9 @@
+{
+  "type": "minecraft:function",
+  "environment": "minecraft:default",
+  "function": "animalweights:sunken_cauldron_y_minus_one_counts",
+  "max_ticks": 10,
+  "required": true,
+  "setup_ticks": 2,
+  "structure": "minecraft:empty"
+}

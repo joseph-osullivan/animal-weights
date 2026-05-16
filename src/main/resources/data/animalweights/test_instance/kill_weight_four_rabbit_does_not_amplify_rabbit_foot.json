@@ -1,0 +1,9 @@
+{
+  "type": "minecraft:function",
+  "environment": "minecraft:default",
+  "function": "animalweights:kill_weight_four_rabbit_does_not_amplify_rabbit_foot",
+  "max_ticks": 5,
+  "required": true,
+  "setup_ticks": 1,
+  "structure": "minecraft:empty"
+}
