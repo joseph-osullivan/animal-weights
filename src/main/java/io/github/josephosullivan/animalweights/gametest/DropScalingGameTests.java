@@ -32,9 +32,13 @@ import java.util.List;
  * wait for vanilla loot tables to fire" path; the only thing under test here
  * is the {@link DropScalingHandler#onLivingDrops} response to the event.
  *
- * <p>Formula being asserted: {@code bonus = max(0, weight - 1)}; bonus is
- * added to the stack count of each primary drop and to the XP returned by
- * {@link LivingExperienceDropEvent}.
+ * <p>Formula being asserted: the accelerating curve in
+ * {@link io.github.josephosullivan.animalweights.AnimalWeightsTuning#DROP_BONUS_BY_WEIGHT}
+ * ({@code {0, 0, 1, 2, 3, 4, 6, 8, 11}}) indexed by weight; bonus is added to
+ * the stack count of each primary drop and to the XP returned by
+ * {@link LivingExperienceDropEvent}. Boundary cases at weight 6 / 7 / 8 live
+ * in {@code DropCurveGameTests}; this class covers cross-species coverage,
+ * sick-drop cap-and-cull, and non-target rejection.
  */
 public final class DropScalingGameTests {
 
@@ -144,33 +148,6 @@ public final class DropScalingGameTests {
         }
         if (leather.getItem().getCount() != 4) {
             helper.fail("weight-4 cow: leather expected 1 + 3 = 4; got " + leather.getItem().getCount());
-            return;
-        }
-        helper.succeed();
-    }
-
-    /**
-     * Spec row: "kill weight-8 cow → +11 bonus" (the accelerating curve from
-     * run-004 section H). Test name dates from the original linear +7 formula
-     * but has been updated to assert the curve.
-     */
-    public static void killWeightEightCowDropsSevenExtra(GameTestHelper helper) {
-        Cow cow = helper.spawnWithNoFreeWill(EntityType.COW, VICTIM_REL);
-        AnimalWeightAttachment.set(cow, 8);
-
-        ItemEntity beef = newDrop(helper, VICTIM_REL, Items.BEEF, 2);
-        ItemEntity leather = newDrop(helper, VICTIM_REL, Items.LEATHER, 1);
-        List<ItemEntity> drops = new ArrayList<>(List.of(beef, leather));
-        postDropsEventGeneric(helper, cow, drops);
-
-        if (beef.getItem().getCount() != 13) {
-            helper.fail("weight-8 cow: beef expected 2 + 11 = 13 (run-004 curve); got "
-                    + beef.getItem().getCount());
-            return;
-        }
-        if (leather.getItem().getCount() != 12) {
-            helper.fail("weight-8 cow: leather expected 1 + 11 = 12 (run-004 curve); got "
-                    + leather.getItem().getCount());
             return;
         }
         helper.succeed();

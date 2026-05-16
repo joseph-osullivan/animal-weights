@@ -155,11 +155,6 @@ public final class ModGameTests {
             () -> DropScalingGameTests::killWeightFourCowDropsThreeExtra);
 
     public static final DeferredHolder<Consumer<GameTestHelper>, Consumer<GameTestHelper>>
-            KILL_WEIGHT_EIGHT_COW_DROPS_SEVEN_EXTRA = TEST_FUNCTIONS.register(
-            "kill_weight_eight_cow_drops_seven_extra",
-            () -> DropScalingGameTests::killWeightEightCowDropsSevenExtra);
-
-    public static final DeferredHolder<Consumer<GameTestHelper>, Consumer<GameTestHelper>>
             KILL_WEIGHT_ZERO_COW_DROPS_VANILLA_NO_SHRINK = TEST_FUNCTIONS.register(
             "kill_weight_zero_cow_drops_vanilla_no_shrink",
             () -> DropScalingGameTests::killWeightZeroCowDropsVanillaNoShrink);

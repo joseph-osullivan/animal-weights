@@ -31,15 +31,6 @@ public final class AnimalWeightsTuning {
     public static final int LIGHT_THRESHOLD = 14;
 
     /**
-     * Edge length of the horizontal box centered on the mob used for the
-     * "stretching room" (no-crowding) check. 3 means a 3×3 horizontal area.
-     *
-     * <p>Retained as a legacy constant — the active implementation has moved to
-     * the BFS-reachability rule (see {@link #MIN_ROAMING_CELLS}).
-     */
-    public static final int STRETCHING_BOX = 3;
-
-    /**
      * Minimum count of walkable cells reachable via BFS from the mob's standing
      * block for the "stretching room" condition to pass. 6 means roughly a
      * 2×3 walkable corridor — enough that a single mob in a 2×2 fenced pen
