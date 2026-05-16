@@ -7,6 +7,7 @@
 <p align="center">
   <a href="https://modrinth.com/mod/animal-weights"><img src="https://img.shields.io/badge/Modrinth-animal--weights-1bd96a?logo=modrinth&logoColor=white" alt="Modrinth" /></a>
   <a href="https://www.curseforge.com/minecraft/mc-mods/animal-weights"><img src="https://img.shields.io/badge/CurseForge-animal--weights-f16436?logo=curseforge&logoColor=white" alt="CurseForge" /></a>
+  <a href="https://ko-fi.com/joseph_osullivan"><img src="https://img.shields.io/badge/Ko--fi-Support-ff5e5b?logo=ko-fi&logoColor=white" alt="Ko-fi" /></a>
 </p>
 
 A Minecraft NeoForge mod that gives farm animals a **weight** value that responds to how well they're kept — affecting how much meat, leather, and XP they drop when killed.
