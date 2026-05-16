@@ -10,6 +10,8 @@ license = "${mod_license}"
 ${mod_description}
 '''
     authors = "${mod_authors}"
+    logoFile = "icon.png"
+    logoBlur = false
     [[mods.dependencies.${mod_id}]]
         modId = "neoforge"
         type = "required"
