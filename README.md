@@ -1,7 +1,7 @@
 # Animal Weights
 
 <p align="center">
-  <img src="src/main/resources/icon.png" alt="Animal Weights icon" width="200" />
+  <img src="icon.png" alt="Animal Weights icon" width="200" />
 </p>
 
 A Minecraft NeoForge mod that gives farm animals a **weight** value that responds to how well they're kept — affecting how much meat, leather, and XP they drop when killed.
