@@ -1,0 +1,9 @@
+{
+  "type": "minecraft:function",
+  "environment": "minecraft:default",
+  "function": "animalweights:weight_zero_zombie_not_affected_by_slowness",
+  "max_ticks": 15,
+  "required": true,
+  "setup_ticks": 2,
+  "structure": "minecraft:empty"
+}

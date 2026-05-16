@@ -1,0 +1,9 @@
+{
+  "type": "minecraft:function",
+  "environment": "minecraft:default",
+  "function": "animalweights:weight_one_cow_with_one_condition_decreases_to_zero",
+  "max_ticks": 10,
+  "required": true,
+  "setup_ticks": 2,
+  "structure": "minecraft:empty"
+}

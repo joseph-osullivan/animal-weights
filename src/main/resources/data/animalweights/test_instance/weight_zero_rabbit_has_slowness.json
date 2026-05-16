@@ -1,0 +1,9 @@
+{
+  "type": "minecraft:function",
+  "environment": "minecraft:default",
+  "function": "animalweights:weight_zero_rabbit_has_slowness",
+  "max_ticks": 40,
+  "required": false,
+  "setup_ticks": 2,
+  "structure": "minecraft:empty"
+}

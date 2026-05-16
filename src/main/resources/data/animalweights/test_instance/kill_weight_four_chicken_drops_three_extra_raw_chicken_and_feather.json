@@ -1,0 +1,9 @@
+{
+  "type": "minecraft:function",
+  "environment": "minecraft:default",
+  "function": "animalweights:kill_weight_four_chicken_drops_three_extra_raw_chicken_and_feather",
+  "max_ticks": 5,
+  "required": true,
+  "setup_ticks": 1,
+  "structure": "minecraft:empty"
+}

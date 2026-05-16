@@ -1,0 +1,9 @@
+{
+  "type": "minecraft:function",
+  "environment": "minecraft:default",
+  "function": "animalweights:kill_weight_one_cow_drops_vanilla_counts",
+  "max_ticks": 5,
+  "required": true,
+  "setup_ticks": 1,
+  "structure": "minecraft:empty"
+}

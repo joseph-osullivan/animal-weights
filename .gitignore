@@ -1,0 +1,15 @@
+.gradle/
+build/
+run/
+runs/
+src/generated/
+docs/
+*.jar
+!gradle/wrapper/gradle-wrapper.jar
+.idea/
+*.iml
+bin/
+out/
+.DS_Store
+.claude/
+.trees/

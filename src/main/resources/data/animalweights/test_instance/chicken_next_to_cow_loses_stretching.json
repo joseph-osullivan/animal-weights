@@ -1,0 +1,9 @@
+{
+  "type": "minecraft:function",
+  "environment": "minecraft:default",
+  "function": "animalweights:chicken_next_to_cow_loses_stretching",
+  "max_ticks": 10,
+  "required": true,
+  "setup_ticks": 2,
+  "structure": "minecraft:empty"
+}
