@@ -238,7 +238,7 @@ public final class ChickenGameTests {
 
     /**
      * Spec: "kill_weight_four_chicken_drops_three_extra_raw_chicken_and_feather"
-     * — weight 4 → bonus 3 → raw_chicken + 3, feather + 3.
+     * — weight 4 → multiplicative scaling → raw_chicken * 4, feather * 4.
      */
     public static void killWeightFourChickenDropsThreeExtraRawChickenAndFeather(GameTestHelper helper) {
         Chicken chicken = helper.spawnWithNoFreeWill(EntityType.CHICKEN, VICTIM_REL);
@@ -251,12 +251,12 @@ public final class ChickenGameTests {
                 helper.getLevel().damageSources().generic(), drops, true));
 
         if (raw.getItem().getCount() != 4) {
-            helper.fail("weight-4 chicken: raw_chicken expected 1 + 3 = 4; got "
+            helper.fail("weight-4 chicken: raw_chicken expected 1 * 4 = 4; got "
                     + raw.getItem().getCount() + " — CHICKEN missing from primary drop set");
             return;
         }
         if (feather.getItem().getCount() != 4) {
-            helper.fail("weight-4 chicken: feather expected 1 + 3 = 4; got "
+            helper.fail("weight-4 chicken: feather expected 1 * 4 = 4; got "
                     + feather.getItem().getCount() + " — FEATHER missing from primary drop set");
             return;
         }
@@ -264,8 +264,9 @@ public final class ChickenGameTests {
     }
 
     /**
-     * Spec: "kill_weight_eight_chicken_drops_seven_extra" — original linear
-     * formula expected +7. Updated for run-004 curve: w=8 → +11.
+     * Spec: "kill_weight_eight_chicken_drops_seven_extra" — multiplicative
+     * scaling means weight 8 yields {@code count * 8}. With a baseline of 1
+     * each, the resulting counts are 8 each.
      */
     public static void killWeightEightChickenDropsSevenExtra(GameTestHelper helper) {
         Chicken chicken = helper.spawnWithNoFreeWill(EntityType.CHICKEN, VICTIM_REL);
@@ -277,13 +278,13 @@ public final class ChickenGameTests {
         NeoForge.EVENT_BUS.post(new LivingDropsEvent(chicken,
                 helper.getLevel().damageSources().generic(), drops, true));
 
-        if (raw.getItem().getCount() != 12) {
-            helper.fail("weight-8 chicken: raw_chicken expected 1 + 11 = 12 (run-004 curve); got "
+        if (raw.getItem().getCount() != 8) {
+            helper.fail("weight-8 chicken: raw_chicken expected 1 * 8 = 8 (multiplicative); got "
                     + raw.getItem().getCount());
             return;
         }
-        if (feather.getItem().getCount() != 12) {
-            helper.fail("weight-8 chicken: feather expected 1 + 11 = 12 (run-004 curve); got "
+        if (feather.getItem().getCount() != 8) {
+            helper.fail("weight-8 chicken: feather expected 1 * 8 = 8 (multiplicative); got "
                     + feather.getItem().getCount());
             return;
         }

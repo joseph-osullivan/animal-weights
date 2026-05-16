@@ -187,12 +187,16 @@ public final class SickStateGameTests {
      * Pins that the handler's target-species filter rejects Zombie even when
      * its attachment is somehow set to 0. Without this check, any mob with a
      * 0 weight would get permanent slowness.
+     *
+     * <p>Wait 10 ticks for the {@link SickStateHandler} 8-tick throttle to
+     * have fired at least once — otherwise a too-short window could mask an
+     * over-broad target-species filter bug.
      */
     public static void weightZeroZombieNotAffectedBySlowness(GameTestHelper helper) {
         Zombie zombie = helper.spawnWithNoFreeWill(EntityType.ZOMBIE, COW_REL);
         AnimalWeightAttachment.set(zombie, 0);
 
-        helper.runAfterDelay(5L, () -> {
+        helper.runAfterDelay(10L, () -> {
             MobEffectInstance effect = zombie.getEffect(MobEffects.SLOWNESS);
             if (effect != null) {
                 helper.fail("weight-0 zombie has SLOWNESS effect — "

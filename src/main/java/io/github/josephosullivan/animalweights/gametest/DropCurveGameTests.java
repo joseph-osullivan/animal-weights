@@ -1,7 +1,6 @@
 package io.github.josephosullivan.animalweights.gametest;
 
 import io.github.josephosullivan.animalweights.AnimalWeightAttachment;
-import io.github.josephosullivan.animalweights.AnimalWeightsTuning;
 import io.github.josephosullivan.animalweights.event.DropScalingHandler;
 import net.minecraft.core.BlockPos;
 import net.minecraft.gametest.framework.GameTestHelper;
@@ -20,30 +19,28 @@ import java.util.ArrayList;
 import java.util.List;
 
 /**
- * Bodies for Tier-2 GameTests covering the accelerating drop-bonus curve.
- * Spec source: run-004 {@code design.md} section H and the curve table in
- * {@link AnimalWeightsTuning#DROP_BONUS_BY_WEIGHT}:
+ * Bodies for Tier-2 GameTests covering the multiplicative drop curve at the
+ * upper weight tiers. Spec source: run-005 {@code decisions.md} Q2 ("Option B
+ * — multiplicative on primary drops"):
  *
  * <pre>
- *   w=1 →  0    w=4 →  +3    w=7 →  +8
- *   w=2 →  +1   w=5 →  +4    w=8 → +11
- *   w=3 →  +2   w=6 →  +6
+ *   stack count: stack.setCount(stack.getCount() * weight)
+ *   xp dropped:  event.getDroppedExperience() * weight
  * </pre>
  *
- * <p>Linear through w=5, then accelerates: w=6 gains +1 over linear, w=7
- * gains +2, w=8 gains +4. Existing run-002/003 tests cover w=4 and w=8 (the
- * w=8 test was originally written for the linear formula); this run pins the
- * three accelerating tiers (w=6, w=7, w=8) end-to-end against the curve
- * table and verifies XP follows the same curve at the peak.
+ * <p>Existing run-002/003 tests cover weight 4 (the canonical case); this
+ * class pins the higher tiers (w=6, w=7, w=8) end-to-end against the
+ * multiplicative formula and verifies XP follows the same multiplier at the
+ * peak.
  *
  * <p>Bugs these tests catch:
  * <ul>
- *   <li>A linear-only handler ({@code bonus = max(0, weight - 1)}) would
- *       fail w=6 (expected +6, gives +5), w=7 (expected +8, gives +6), and
- *       w=8 (expected +11, gives +7).</li>
- *   <li>An XP path that uses a different table from drops would diverge at
- *       weights 6+ — the spec says XP uses the SAME curve.</li>
- *   <li>An off-by-one in the {@code DROP_BONUS_BY_WEIGHT} array.</li>
+ *   <li>A regression to the old additive curve {0,0,1,2,3,4,6,8,11} — under
+ *       additive, weight-8 on baseCount=2 would yield 2+11=13; multiplicative
+ *       requires 2*8=16. Mismatch is loud.</li>
+ *   <li>An XP path that uses a different multiplier from drops — the spec
+ *       says XP uses the SAME weight multiplier.</li>
+ *   <li>Off-by-one in the weight clamp on the upper bound.</li>
  * </ul>
  */
 public final class DropCurveGameTests {
@@ -66,8 +63,8 @@ public final class DropCurveGameTests {
     }
 
     /**
-     * Spec row H: "Kill weight-6 cow → +6 extra beef." Pins the first
-     * curve-deviation tier: at w=6 the bonus is +6 instead of the linear +5.
+     * Spec row: "Kill weight-6 cow → beef * 6." Pins the mid-range multiplier
+     * — base 2 must become 12.
      */
     public static void killWeightSixCowDropsSixExtraBeef(GameTestHelper helper) {
         Cow cow = helper.spawnWithNoFreeWill(EntityType.COW, VICTIM_REL);
@@ -77,19 +74,18 @@ public final class DropCurveGameTests {
         List<ItemEntity> drops = new ArrayList<>(List.of(beef));
         postDropsEventGeneric(helper, cow, drops);
 
-        // Expect 2 + 6 = 8. Linear would give 2 + 5 = 7.
-        if (beef.getItem().getCount() != 8) {
-            helper.fail("weight-6 cow: beef expected 2 + 6 = 8 (curve table); got "
+        // Expect 2 * 6 = 12. Old additive curve would have given 2 + 6 = 8.
+        if (beef.getItem().getCount() != 12) {
+            helper.fail("weight-6 cow: beef expected 2 * 6 = 12 (multiplicative); got "
                     + beef.getItem().getCount()
-                    + " — handler may be using linear (weight - 1) instead of DROP_BONUS_BY_WEIGHT[6]=+6");
+                    + " — handler may be using legacy additive DROP_BONUS_BY_WEIGHT");
             return;
         }
         helper.succeed();
     }
 
     /**
-     * Spec row H: "Kill weight-7 cow → +8 extra beef." Curve gains +2 over
-     * linear at w=7.
+     * Spec row: "Kill weight-7 cow → beef * 7." Base 2 must become 14.
      */
     public static void killWeightSevenCowDropsEightExtraBeef(GameTestHelper helper) {
         Cow cow = helper.spawnWithNoFreeWill(EntityType.COW, VICTIM_REL);
@@ -99,19 +95,19 @@ public final class DropCurveGameTests {
         List<ItemEntity> drops = new ArrayList<>(List.of(beef));
         postDropsEventGeneric(helper, cow, drops);
 
-        // Expect 2 + 8 = 10. Linear would give 2 + 6 = 8.
-        if (beef.getItem().getCount() != 10) {
-            helper.fail("weight-7 cow: beef expected 2 + 8 = 10 (curve table); got "
+        // Expect 2 * 7 = 14. Old additive curve would have given 2 + 8 = 10.
+        if (beef.getItem().getCount() != 14) {
+            helper.fail("weight-7 cow: beef expected 2 * 7 = 14 (multiplicative); got "
                     + beef.getItem().getCount()
-                    + " — handler may be using linear or DROP_BONUS_BY_WEIGHT[7] is wrong");
+                    + " — handler may be using legacy additive DROP_BONUS_BY_WEIGHT");
             return;
         }
         helper.succeed();
     }
 
     /**
-     * Spec row H: "Kill weight-8 cow → +11 extra beef." Peak of the curve;
-     * +4 over linear.
+     * Spec row: "Kill weight-8 cow → beef * 8." Peak multiplier; base 2 must
+     * become 16.
      */
     public static void killWeightEightCowDropsElevenExtraBeef(GameTestHelper helper) {
         Cow cow = helper.spawnWithNoFreeWill(EntityType.COW, VICTIM_REL);
@@ -121,24 +117,24 @@ public final class DropCurveGameTests {
         List<ItemEntity> drops = new ArrayList<>(List.of(beef));
         postDropsEventGeneric(helper, cow, drops);
 
-        // Expect 2 + 11 = 13. Linear would give 2 + 7 = 9.
-        if (beef.getItem().getCount() != 13) {
-            helper.fail("weight-8 cow: beef expected 2 + 11 = 13 (peak of curve); got "
+        // Expect 2 * 8 = 16. Old additive curve would have given 2 + 11 = 13.
+        if (beef.getItem().getCount() != 16) {
+            helper.fail("weight-8 cow: beef expected 2 * 8 = 16 (peak multiplier); got "
                     + beef.getItem().getCount()
-                    + " — handler may be using linear or DROP_BONUS_BY_WEIGHT[8] is wrong");
+                    + " — handler may be using legacy additive DROP_BONUS_BY_WEIGHT");
             return;
         }
         helper.succeed();
     }
 
     /**
-     * Spec row H: "XP at weight 8 uses the same curve." Pins that
-     * {@link DropScalingHandler#onLivingExperienceDrop} reads from the same
-     * {@code DROP_BONUS_BY_WEIGHT} table as the drop path; without that
-     * coupling, XP could diverge from drops at w&ge;6.
+     * Spec row: "XP at weight 8 uses the same multiplier." Pins that
+     * {@link DropScalingHandler#onLivingExperienceDrop} applies the same
+     * weight multiplier as the drop path; without that coupling, XP could
+     * diverge from drops.
      *
      * <p>Spawn weight-8 cow, post a {@link LivingExperienceDropEvent} with
-     * base XP = 5 (vanilla cow base). Expect 5 + 11 = 16.
+     * base XP = 5 (vanilla cow base). Expect 5 * 8 = 40.
      */
     public static void xpAtWeightEightUsesSameCurve(GameTestHelper helper) {
         Cow cow = helper.spawnWithNoFreeWill(EntityType.COW, VICTIM_REL);
@@ -147,12 +143,12 @@ public final class DropCurveGameTests {
         LivingExperienceDropEvent xpEvent = new LivingExperienceDropEvent(cow, null, /* base */ 5);
         NeoForge.EVENT_BUS.post(xpEvent);
 
-        // Expect 5 + 11 = 16. Linear would give 5 + 7 = 12.
-        if (xpEvent.getDroppedExperience() != 16) {
-            helper.fail("weight-8 cow: XP expected 5 + 11 = 16 (curve peak); got "
+        // Expect 5 * 8 = 40. Old additive curve would have given 5 + 11 = 16.
+        if (xpEvent.getDroppedExperience() != 40) {
+            helper.fail("weight-8 cow: XP expected 5 * 8 = 40 (peak multiplier); got "
                     + xpEvent.getDroppedExperience()
-                    + " — XP path may not use the same DROP_BONUS_BY_WEIGHT curve as drops, or "
-                    + "is still using the old linear formula");
+                    + " — XP path may not use the same weight multiplier as drops, or "
+                    + "is still using the old additive formula");
             return;
         }
         helper.succeed();

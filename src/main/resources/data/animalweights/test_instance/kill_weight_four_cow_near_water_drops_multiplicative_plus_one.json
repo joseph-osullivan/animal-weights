@@ -1,8 +1,8 @@
 {
   "type": "minecraft:function",
   "environment": "minecraft:default",
-  "function": "animalweights:adult_cow_in_same_conditions_does_get_slowness",
-  "max_ticks": 20,
+  "function": "animalweights:kill_weight_four_cow_near_water_drops_multiplicative_plus_one",
+  "max_ticks": 10,
   "required": true,
   "setup_ticks": 2,
   "structure": "minecraft:empty"

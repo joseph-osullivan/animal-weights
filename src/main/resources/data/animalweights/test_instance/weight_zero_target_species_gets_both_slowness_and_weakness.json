@@ -1,7 +1,7 @@
 {
   "type": "minecraft:function",
   "environment": "minecraft:default",
-  "function": "animalweights:weight_zero_chicken_has_slowness",
+  "function": "animalweights:weight_zero_target_species_gets_both_slowness_and_weakness",
   "max_ticks": 60,
   "required": false,
   "setup_ticks": 2,

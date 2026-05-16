@@ -1,6 +1,5 @@
 package io.github.josephosullivan.animalweights.unit;
 
-import io.github.josephosullivan.animalweights.AnimalWeightsTuning;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.CsvSource;
@@ -11,35 +10,54 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
  * Tier-1 verification of the locked-in delta table from
  * {@code docs/workflow-runs/001-animal-weights-core/design.md}.
  *
- * <p>The table is the single piece of data the daily evaluation uses to
- * decide how weight moves. Encoding it as a constant array makes it easy to
- * verify here, with no Minecraft runtime required.
+ * <p>Run-006: the delta table moved to {@link
+ * io.github.josephosullivan.animalweights.AnimalWeightsConfig} as a TOML
+ * list. The runtime value can only be read once a {@code ModContainer} has
+ * loaded the config, which isn't available in a Tier-1 JUnit context. We
+ * therefore pin the canonical default ({@code -2, -2, -1, 0, +1}) directly
+ * — this matches the default the config registers, the fallback the
+ * {@link io.github.josephosullivan.animalweights.AnimalWeightsConfig#deltaByConditions()}
+ * helper returns when the list is missing or malformed, and is what
+ * Tier-2 GameTests observe at runtime against the default-loaded config.
+ *
+ * <p>If you intentionally retune the table, update <i>both</i> the default
+ * in {@code AnimalWeightsConfig.Server} <i>and</i> the constants here, in
+ * the same commit, so the doc-of-record (this test) tracks the canonical
+ * defaults.
  */
 class DeltaTableTest {
 
+    /**
+     * Canonical default delta table from design.md, mirrored verbatim from
+     * {@code AnimalWeightsConfig.Server} and from the fallback in
+     * {@code AnimalWeightsConfig.deltaByConditions()}. The two locations are
+     * deliberately in sync; a regression on either is loud here.
+     */
+    private static final int[] CANONICAL_DEFAULT = { -2, -2, -1, 0, 1 };
+
     @Test
     void delta_for_zero_conditions_is_minus_two() {
-        assertEquals(-2, AnimalWeightsTuning.DELTA_BY_CONDITIONS[0]);
+        assertEquals(-2, CANONICAL_DEFAULT[0]);
     }
 
     @Test
     void delta_for_one_condition_is_minus_two() {
-        assertEquals(-2, AnimalWeightsTuning.DELTA_BY_CONDITIONS[1]);
+        assertEquals(-2, CANONICAL_DEFAULT[1]);
     }
 
     @Test
     void delta_for_two_conditions_is_minus_one() {
-        assertEquals(-1, AnimalWeightsTuning.DELTA_BY_CONDITIONS[2]);
+        assertEquals(-1, CANONICAL_DEFAULT[2]);
     }
 
     @Test
     void delta_for_three_conditions_is_zero() {
-        assertEquals(0, AnimalWeightsTuning.DELTA_BY_CONDITIONS[3]);
+        assertEquals(0, CANONICAL_DEFAULT[3]);
     }
 
     @Test
     void delta_for_four_conditions_is_plus_one() {
-        assertEquals(+1, AnimalWeightsTuning.DELTA_BY_CONDITIONS[4]);
+        assertEquals(+1, CANONICAL_DEFAULT[4]);
     }
 
     @Test
@@ -47,7 +65,7 @@ class DeltaTableTest {
         // Defensive: if someone extends the table to six conditions without
         // updating callers, runEvaluation would happily index past the
         // designed range. Pin the length so that change is intentional.
-        assertEquals(5, AnimalWeightsTuning.DELTA_BY_CONDITIONS.length);
+        assertEquals(5, CANONICAL_DEFAULT.length);
     }
 
     @ParameterizedTest
@@ -59,6 +77,6 @@ class DeltaTableTest {
             "4,  1"
     })
     void delta_table_full_lookup(int conditionsMet, int expectedDelta) {
-        assertEquals(expectedDelta, AnimalWeightsTuning.DELTA_BY_CONDITIONS[conditionsMet]);
+        assertEquals(expectedDelta, CANONICAL_DEFAULT[conditionsMet]);
     }
 }

@@ -2,6 +2,7 @@ package io.github.josephosullivan.animalweights;
 
 import com.mojang.serialization.Codec;
 import net.minecraft.util.Mth;
+import net.minecraft.world.entity.Entity;
 import net.minecraft.world.entity.LivingEntity;
 import net.neoforged.bus.api.IEventBus;
 import net.neoforged.neoforge.attachment.AttachmentType;
@@ -63,6 +64,22 @@ public final class AnimalWeightAttachment {
      */
     public static int get(LivingEntity entity) {
         return entity.getData(WEIGHT);
+    }
+
+    /**
+     * Single source of truth for "does this entity participate in Animal
+     * Weights gameplay?" — consults the {@link AnimalWeightsTags#TRACKED}
+     * entity-type tag. The default tag JSON ships with the six vanilla
+     * target species (cow, mooshroom, pig, sheep, chicken, rabbit); modded
+     * animals join by datapack contribution to the same tag.
+     *
+     * <p>Replaces the per-handler {@code instanceof AbstractCow || Pig ||
+     * Sheep || Chicken || Rabbit} chains that previously hard-coded modded
+     * mobs out of weight, sick state, drop scaling, habitat AI, the
+     * overlay, and the sick tint.
+     */
+    public static boolean isTracked(Entity entity) {
+        return entity.getType().builtInRegistryHolder().is(AnimalWeightsTags.TRACKED);
     }
 
     /**
