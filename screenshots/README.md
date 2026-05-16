@@ -18,7 +18,7 @@ Cows, pigs, sheep, chickens, rabbits, and mooshrooms all get an integer weight f
 
 ## 2. Default state: weight 1, vanilla drops
 
-A freshly-spawned animal wandering the world starts at weight 1 — vanilla drops, vanilla XP, no sickness. Nothing changes until you put it in (or near) something.
+A freshly-spawned animal wandering the world starts at weight 1 — vanilla drops, vanilla XP, no sickness. In open terrain wild animals usually plateau here: they have light, grass, and room to roam, but no water source within reach (3 of 4 conditions = plateau).
 
 ![Cows roaming at weight 1](mobs_wandering_around_level_1.png)
 
