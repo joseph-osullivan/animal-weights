@@ -2,6 +2,10 @@
 
 A visual tour of what the mod does in-game. For the full mechanic spec, see the [main README](../README.md).
 
+> **Note:** The coloured numbers above each mob in these screenshots are added **for illustrative purposes only** so you can see the mechanic at work. The actual mod does **not** put any labels above your animals — here's what they really look like in-game:
+>
+> ![Animals in-game without illustrative labels](animals_without_label.png)
+
 ---
 
 ## 1. Every farm animal carries a weight
