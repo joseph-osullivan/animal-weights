@@ -13,7 +13,7 @@ version = project.mod_version
 group = 'io.github.josephosullivan.animalweights'
 
 base {
-    archivesName = project.mod_id
+    archivesName = 'animal-weights'
 }
 
 repositories {

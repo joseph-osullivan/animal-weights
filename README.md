@@ -67,12 +67,12 @@ Baby animals are skipped from all of the above — no weight evaluation, no slow
 
 ## Installation
 
-This mod requires **NeoForge 26.1.x** (Minecraft 1.21+). Pre-built jars are not yet published; build from source per the steps below.
+This mod requires **NeoForge 26.1.x** (Minecraft 26.1.x). Download the jar from the [latest release](https://github.com/joseph-osullivan/animal-weights/releases) or build from source per the steps below.
 
 To install in a vanilla NeoForge installation:
 
 1. Build the mod jar (see "Building from source").
-2. Drop `build/libs/animalweights-<version>.jar` into your `mods/` folder.
+2. Drop `build/libs/animal-weights-<version>.jar` into your `mods/` folder.
 3. Launch Minecraft with the NeoForge profile.
 
 The mod is **server-side** for all gameplay logic — only the host of a multiplayer server or single-player world needs the mod installed. (Connected clients still need it to see effect particles correctly, since vanilla replicates `Slowness` to clients.)
