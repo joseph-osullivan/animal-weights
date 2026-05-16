@@ -8,6 +8,8 @@ A Minecraft NeoForge mod that gives farm animals a **weight** value that respond
 
 Original concept: [u/Axoladdy on Reddit](https://www.reddit.com/r/Minecraft/comments/1te0m69/animal_weights_a_simple_mechanic_to_encourage/).
 
+See the [screenshot walkthrough](screenshots/README.md) for a visual tour of the mechanic.
+
 ## What it does
 
 Every cow, pig, sheep, chicken, rabbit, and mooshroom carries an integer **weight** between 0 and 8 (default 1). Each in-game day at dawn, the mob is evaluated against four living conditions in its surroundings:
