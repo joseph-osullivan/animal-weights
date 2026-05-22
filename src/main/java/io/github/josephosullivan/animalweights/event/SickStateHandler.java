@@ -3,39 +3,37 @@ package io.github.josephosullivan.animalweights.event;
 import io.github.josephosullivan.animalweights.AnimalWeightAttachment;
 import io.github.josephosullivan.animalweights.AnimalWeights;
 import io.github.josephosullivan.animalweights.AnimalWeightsTuning;
+import net.minecraft.server.level.ServerLevel;
 import net.minecraft.world.effect.MobEffectInstance;
 import net.minecraft.world.effect.MobEffects;
 import net.minecraft.world.entity.Entity;
 import net.minecraft.world.entity.LivingEntity;
 import net.minecraft.world.entity.Mob;
 import net.minecraft.world.entity.animal.Animal;
-import net.minecraft.world.entity.animal.chicken.Chicken;
-import net.minecraft.world.entity.animal.cow.AbstractCow;
-import net.minecraft.world.entity.animal.pig.Pig;
-import net.minecraft.world.entity.animal.rabbit.Rabbit;
-import net.minecraft.world.entity.animal.sheep.Sheep;
-import net.neoforged.api.distmarker.Dist;
 import net.neoforged.bus.api.SubscribeEvent;
 import net.neoforged.fml.common.EventBusSubscriber;
 import net.neoforged.neoforge.event.entity.living.BabyEntitySpawnEvent;
 import net.neoforged.neoforge.event.tick.EntityTickEvent;
 
 /**
- * Implements the "sick" state for target-species mobs (Cow/Pig/Sheep, plus
- * Chicken/Rabbit/Mooshroom in run-003) whose
- * {@link AnimalWeightAttachment weight} has fallen to {@link AnimalWeightsTuning#WEIGHT_MIN 0}.
- * Mooshroom is auto-covered via {@link AbstractCow} — in MC 26.1 it sits
- * alongside {@link net.minecraft.world.entity.animal.cow.Cow} under
- * {@code AbstractCow}, not as a subclass of {@code Cow}.
+ * Implements the "sick" state for target-species mobs (membership defined by
+ * the {@link io.github.josephosullivan.animalweights.AnimalWeightsTags#TRACKED}
+ * entity-type tag — by default cow, mooshroom, pig, sheep, chicken, rabbit;
+ * extensible to modded animals via datapack) whose {@link AnimalWeightAttachment
+ * weight} has fallen to {@link AnimalWeightsTuning#WEIGHT_MIN 0}.
  *
- * <p>Two visible effects:
+ * <p>Three visible effects:
  * <ul>
  *   <li><b>Slowness</b>: each server tick a weight-0 target species mob is
  *       given {@link MobEffects#SLOWNESS} (amplifier 0, 40 ticks,
- *       hidden particles/icon). We only re-apply when the effect is missing
- *       or about to expire (&lt; {@link #SLOWNESS_REFRESH_THRESHOLD_TICKS} ticks
- *       remaining) so we are not paying for a {@code setData} call on every
- *       single entity tick.</li>
+ *       hidden particles, no HUD icon). We only re-apply when the effect is
+ *       missing or about to expire (&lt; {@link #SICK_EFFECT_REFRESH_THRESHOLD_TICKS}
+ *       ticks remaining) so we are not paying for a {@code setData} call on
+ *       every single entity tick.</li>
+ *   <li><b>Weakness</b>: same cadence as Slowness but {@link MobEffects#WEAKNESS}
+ *       with a visible HUD icon (per run-005 decisions.md Q4) so the player
+ *       targeting the animal sees a clear sick tell. Hidden particles, same
+ *       duration and refresh threshold as Slowness.</li>
  *   <li><b>Breeding block</b>: {@link BabyEntitySpawnEvent} is cancelled when
  *       either parent is a weight-0 target species. We also call
  *       {@link Animal#resetLove()} on both parents to be defensive — vanilla
@@ -52,19 +50,23 @@ import net.neoforged.neoforge.event.tick.EntityTickEvent;
 @EventBusSubscriber(modid = AnimalWeights.MOD_ID)
 public final class SickStateHandler {
 
-    /** Slowness duration applied each refresh, in ticks (2 seconds at 20 TPS). */
-    static final int SLOWNESS_DURATION_TICKS = 40;
+    /**
+     * Duration applied each refresh for both Slowness and Weakness, in ticks
+     * (2 seconds at 20 TPS). Renamed from {@code SLOWNESS_DURATION_TICKS} in
+     * run-005 task-7 when Weakness joined Slowness as a sick effect.
+     */
+    static final int SICK_EFFECT_DURATION_TICKS = 40;
 
-    /** Slowness amplifier. 0 == "Slowness I". */
-    static final int SLOWNESS_AMPLIFIER = 0;
+    /** Amplifier for both effects. 0 == level I. */
+    static final int SICK_EFFECT_AMPLIFIER = 0;
 
     /**
-     * If the existing slowness effect has fewer than this many ticks left, we
-     * top it up. Picked at 10 ticks (0.5 s) so we get at least one full refresh
-     * before a mob ever drops below the effect — but we still avoid
-     * re-{@code addEffect}ing every single tick.
+     * If the existing sick effect (either Slowness or Weakness) has fewer than
+     * this many ticks left, we top it up. Picked at 10 ticks (0.5 s) so we get
+     * at least one full refresh before a mob ever drops below an effect — but
+     * we still avoid re-{@code addEffect}ing every single tick.
      */
-    static final int SLOWNESS_REFRESH_THRESHOLD_TICKS = 10;
+    static final int SICK_EFFECT_REFRESH_THRESHOLD_TICKS = 10;
 
     private SickStateHandler() {
         // event handler — no instances
@@ -86,13 +88,25 @@ public final class SickStateHandler {
     @SubscribeEvent
     public static void onEntityTickPost(EntityTickEvent.Post event) {
         Entity entity = event.getEntity();
-        if (entity.level().isClientSide()) {
+        // Perf fix #6: throttle to roughly every 8th tick using an entity-id
+        // offset so per-entity work is scattered across ticks instead of all
+        // firing on the same one. The sick effects use a 40-tick duration
+        // with a 10-tick refresh threshold (SICK_EFFECT_REFRESH_THRESHOLD_TICKS),
+        // so checking every ~8 ticks still keeps us comfortably ahead of
+        // expiry. We need a ServerLevel for getGameTime() and to keep this
+        // server-side anyway.
+        if (!(entity.level() instanceof ServerLevel sl)) {
             return;
         }
-        if (!isTargetSpecies(entity)) {
+        if (((sl.getGameTime() + entity.getId()) & 7) != 0) {
             return;
         }
-        LivingEntity living = (LivingEntity) entity;
+        if (!AnimalWeightAttachment.isTracked(entity)) {
+            return;
+        }
+        if (!(entity instanceof LivingEntity living)) {
+            return; // tag could legally contain non-LivingEntity types; gate before cast
+        }
         if (living instanceof Mob mobEntity && mobEntity.isBaby()) {
             return; // babies don't participate in sick state
         }
@@ -100,14 +114,29 @@ public final class SickStateHandler {
             return;
         }
 
-        MobEffectInstance existing = living.getEffect(MobEffects.SLOWNESS);
-        if (existing == null || existing.getDuration() < SLOWNESS_REFRESH_THRESHOLD_TICKS) {
+        MobEffectInstance existingSlowness = living.getEffect(MobEffects.SLOWNESS);
+        if (existingSlowness == null
+                || existingSlowness.getDuration() < SICK_EFFECT_REFRESH_THRESHOLD_TICKS) {
             living.addEffect(new MobEffectInstance(
                     MobEffects.SLOWNESS,
-                    SLOWNESS_DURATION_TICKS,
-                    SLOWNESS_AMPLIFIER,
+                    SICK_EFFECT_DURATION_TICKS,
+                    SICK_EFFECT_AMPLIFIER,
                     /* ambient */ false,
                     /* visible */ false));
+        }
+
+        // Weakness as second sick effect (run-005 task-7, decisions.md Q4).
+        // visible=true so the player gets a HUD icon when targeting the animal;
+        // ambient=false to match Slowness. Same duration/refresh threshold.
+        MobEffectInstance existingWeakness = living.getEffect(MobEffects.WEAKNESS);
+        if (existingWeakness == null
+                || existingWeakness.getDuration() < SICK_EFFECT_REFRESH_THRESHOLD_TICKS) {
+            living.addEffect(new MobEffectInstance(
+                    MobEffects.WEAKNESS,
+                    SICK_EFFECT_DURATION_TICKS,
+                    SICK_EFFECT_AMPLIFIER,
+                    /* ambient */ false,
+                    /* visible */ true));
         }
     }
 
@@ -124,20 +153,9 @@ public final class SickStateHandler {
         resetLoveSafely(parentB);
     }
 
-    /**
-     * True iff the entity is a target species: Cow/Mooshroom (any
-     * {@link AbstractCow}), Pig, Sheep, Chicken, or Rabbit. Other species are
-     * out of scope.
-     */
-    private static boolean isTargetSpecies(Entity entity) {
-        return entity instanceof AbstractCow || entity instanceof Pig
-                || entity instanceof Sheep || entity instanceof Chicken
-                || entity instanceof Rabbit;
-    }
-
     /** True iff this parent is a target species AND its current weight is 0. */
     private static boolean hasSickTargetParent(Mob parent) {
-        if (!isTargetSpecies(parent)) {
+        if (!AnimalWeightAttachment.isTracked(parent)) {
             return false;
         }
         return isSick(AnimalWeightAttachment.get(parent));

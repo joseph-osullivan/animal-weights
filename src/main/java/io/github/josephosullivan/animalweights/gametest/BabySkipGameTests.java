@@ -122,8 +122,10 @@ public final class BabySkipGameTests {
      * spec excludes babies entirely.
      *
      * <p>Layout: cow on grass at isolated position, set to baby + weight 0.
-     * Wait 5 ticks (well beyond the &gt;= 1 needed for EntityTickEvent.Post to
-     * fire on the baby's first server tick), assert no slowness.
+     * Wait 10 ticks. The perf throttle in {@link SickStateHandler} runs once
+     * every 8 ticks per entity (offset by entity id), so 10 ticks guarantees
+     * the handler has had at least one chance to fire — meaning if the baby
+     * guard is broken, slowness WILL have been applied by check time.
      */
     public static void babyCowDoesNotGetSlowness(GameTestHelper helper) {
         Cow baby = helper.spawnWithNoFreeWill(EntityType.COW, new BlockPos(2, 2, 2));
@@ -137,10 +139,10 @@ public final class BabySkipGameTests {
             baby.setBaby(true);
 
             AnimalWeightAttachment.set(baby, 0);
-            // Wait 5 ticks for any SickStateHandler tick to have a chance to
-            // fire. With weight=0 + isBaby() the handler should bail out at
-            // the baby guard.
-            helper.runAfterDelay(5L, () -> {
+            // Wait 10 ticks for the SickStateHandler throttle (8-tick period)
+            // to have fired at least once. With weight=0 + isBaby() the
+            // handler should bail out at the baby guard.
+            helper.runAfterDelay(10L, () -> {
                 if (!baby.isBaby()) {
                     helper.fail("test setup: baby grew up during the slowness check window");
                     return;
@@ -166,33 +168,37 @@ public final class BabySkipGameTests {
      * guard for everything (over-broad bail-out), THIS test catches it
      * because the adult would also lose slowness.
      *
-     * <p>Layout: baby cow + adult cow at adjacent positions in the isolated
-     * area, both weight 0. After 5 ticks: adult has slowness, baby doesn't.
+     * <p>Layout: baby cow + adult cow at adjacent positions inside the test
+     * cell (not teleported elsewhere — entity ticks must run for slowness
+     * application, and the test cell's chunk is already loaded). Both
+     * weight 0. After 10 ticks: adult has slowness, baby doesn't.
+     *
+     * <p>Wait window: {@link SickStateHandler#onEntityTickPost} runs only
+     * once every 8 ticks per entity (perf throttle, offset by entity id), so
+     * the worst-case latency before the adult's slowness fires is 7 ticks.
+     * We wait 10 to guarantee at least one fire with margin.
      */
     public static void adultCowInSameConditionsDoesGetSlowness(GameTestHelper helper) {
+        // Keep both cows inside the test cell. Teleporting to a far-away
+        // isolated chunk (as the baby tests do) does not work here because
+        // those tests only assert ABSENCE of slowness, which is trivially
+        // true if the cow is in an unloaded chunk and not ticking. This test
+        // asserts PRESENCE of slowness on the adult, which requires the
+        // adult's chunk to be loaded and its EntityTickEvent.Post to fire.
         Cow baby = helper.spawnWithNoFreeWill(EntityType.COW, new BlockPos(2, 2, 2));
         Cow adult = helper.spawnWithNoFreeWill(EntityType.COW, new BlockPos(2, 2, 4));
         baby.setBaby(true);
-        // Set weight to 0 immediately (matches the timing of the passing
-        // weight_zero_cow_gets_slowness_after_one_tick test).
         AnimalWeightAttachment.set(baby, 0);
         AnimalWeightAttachment.set(adult, 0);
-        BlockPos pen = nextIsolatedPos();
 
         helper.runAfterDelay(2L, () -> {
-            ServerLevel level = helper.getLevel();
-            teleportToIsolation(baby, pen);
-            // Adult one cell east of baby.
-            adult.snapTo(pen.getX() + 1 + 0.5, (double) pen.getY(), pen.getZ() + 0.5, 0.0F, 0.0F);
-            setAbsBlock(level, pen.below(), Blocks.GRASS_BLOCK.defaultBlockState());
-            setAbsBlock(level, pen.offset(1, -1, 0), Blocks.GRASS_BLOCK.defaultBlockState());
             // Re-arm in case anything (eval / setBaby reset) clobbered the
-            // pre-snapTo values.
+            // initial values during the 2-tick settle.
             baby.setBaby(true);
             AnimalWeightAttachment.set(baby, 0);
             AnimalWeightAttachment.set(adult, 0);
 
-            helper.runAfterDelay(5L, () -> {
+            helper.runAfterDelay(10L, () -> {
                 if (!baby.isBaby()) {
                     helper.fail("test setup: baby grew up during the slowness check window");
                     return;

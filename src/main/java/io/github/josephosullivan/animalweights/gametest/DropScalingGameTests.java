@@ -32,12 +32,12 @@ import java.util.List;
  * wait for vanilla loot tables to fire" path; the only thing under test here
  * is the {@link DropScalingHandler#onLivingDrops} response to the event.
  *
- * <p>Formula being asserted: the accelerating curve in
- * {@link io.github.josephosullivan.animalweights.AnimalWeightsTuning#DROP_BONUS_BY_WEIGHT}
- * ({@code {0, 0, 1, 2, 3, 4, 6, 8, 11}}) indexed by weight; bonus is added to
- * the stack count of each primary drop and to the XP returned by
- * {@link LivingExperienceDropEvent}. Boundary cases at weight 6 / 7 / 8 live
- * in {@code DropCurveGameTests}; this class covers cross-species coverage,
+ * <p>Formula being asserted (Option B, run-005 decisions Q2): primary-drop
+ * stack count is {@code stack.setCount(stack.getCount() * weight)} and dropped
+ * XP is {@code event.getDroppedExperience() * weight} for {@code weight >= 2}.
+ * Weight 1 leaves counts unchanged (identity multiplier); weight 0 routes to
+ * sick-drop cap-and-cull. Boundary cases at weight 6 / 7 / 8 live in
+ * {@code DropCurveGameTests}; this class covers cross-species coverage,
  * sick-drop cap-and-cull, and non-target rejection.
  */
 public final class DropScalingGameTests {
@@ -130,8 +130,8 @@ public final class DropScalingGameTests {
     }
 
     /**
-     * Spec row: "kill weight-4 cow → beef +3, leather +3, XP +3". Pins the
-     * formula end-to-end for the canonical test case.
+     * Spec row: "kill weight-4 cow → beef * 4, leather * 4, XP * 4". Pins the
+     * multiplicative formula end-to-end for the canonical test case.
      */
     public static void killWeightFourCowDropsThreeExtra(GameTestHelper helper) {
         Cow cow = helper.spawnWithNoFreeWill(EntityType.COW, VICTIM_REL);
@@ -142,12 +142,12 @@ public final class DropScalingGameTests {
         List<ItemEntity> drops = new ArrayList<>(List.of(beef, leather));
         postDropsEventGeneric(helper, cow, drops);
 
-        if (beef.getItem().getCount() != 5) {
-            helper.fail("weight-4 cow: beef expected 2 + 3 = 5; got " + beef.getItem().getCount());
+        if (beef.getItem().getCount() != 8) {
+            helper.fail("weight-4 cow: beef expected 2 * 4 = 8; got " + beef.getItem().getCount());
             return;
         }
         if (leather.getItem().getCount() != 4) {
-            helper.fail("weight-4 cow: leather expected 1 + 3 = 4; got " + leather.getItem().getCount());
+            helper.fail("weight-4 cow: leather expected 1 * 4 = 4; got " + leather.getItem().getCount());
             return;
         }
         helper.succeed();
@@ -185,8 +185,8 @@ public final class DropScalingGameTests {
     }
 
     /**
-     * Spec row: "kill weight-4 pig → pork +3". Species coverage — Pig must be
-     * recognised as a primary-drop target.
+     * Spec row: "kill weight-4 pig → pork * 4". Species coverage — Pig must
+     * be recognised as a primary-drop target.
      */
     public static void killWeightFourPigDropsThreeExtraPork(GameTestHelper helper) {
         Pig pig = helper.spawnWithNoFreeWill(EntityType.PIG, VICTIM_REL);
@@ -196,15 +196,15 @@ public final class DropScalingGameTests {
         List<ItemEntity> drops = new ArrayList<>(List.of(pork));
         postDropsEventGeneric(helper, pig, drops);
 
-        if (pork.getItem().getCount() != 5) {
-            helper.fail("weight-4 pig: pork expected 2 + 3 = 5; got " + pork.getItem().getCount());
+        if (pork.getItem().getCount() != 8) {
+            helper.fail("weight-4 pig: pork expected 2 * 4 = 8; got " + pork.getItem().getCount());
             return;
         }
         helper.succeed();
     }
 
     /**
-     * Spec row: "kill weight-4 sheep (white wool) → mutton +3, wool +3".
+     * Spec row: "kill weight-4 sheep (white wool) → mutton * 4, wool * 4".
      * Pins both the mutton entry and {@code ItemTags.WOOL} matching white
      * wool.
      */
@@ -218,11 +218,11 @@ public final class DropScalingGameTests {
         postDropsEventGeneric(helper, sheep, drops);
 
         if (mutton.getItem().getCount() != 4) {
-            helper.fail("weight-4 sheep: mutton expected 1 + 3 = 4; got " + mutton.getItem().getCount());
+            helper.fail("weight-4 sheep: mutton expected 1 * 4 = 4; got " + mutton.getItem().getCount());
             return;
         }
         if (wool.getItem().getCount() != 4) {
-            helper.fail("weight-4 sheep: white_wool expected 1 + 3 = 4; got " + wool.getItem().getCount()
+            helper.fail("weight-4 sheep: white_wool expected 1 * 4 = 4; got " + wool.getItem().getCount()
                     + " — ItemTags.WOOL may not cover white wool");
             return;
         }
@@ -230,8 +230,8 @@ public final class DropScalingGameTests {
     }
 
     /**
-     * Spec row: "kill weight-4 sheep (red wool — pre-coloured) → mutton +3,
-     * red-wool stack +3". Pins that {@code ItemTags.WOOL} covers all dye
+     * Spec row: "kill weight-4 sheep (red wool — pre-coloured) → mutton * 4,
+     * red-wool stack * 4". Pins that {@code ItemTags.WOOL} covers all dye
      * colours, not just white.
      */
     public static void killWeightFourSheepDropsThreeExtraRedWool(GameTestHelper helper) {
@@ -243,7 +243,7 @@ public final class DropScalingGameTests {
         postDropsEventGeneric(helper, sheep, drops);
 
         if (wool.getItem().getCount() != 4) {
-            helper.fail("weight-4 sheep: red_wool expected 1 + 3 = 4; got " + wool.getItem().getCount()
+            helper.fail("weight-4 sheep: red_wool expected 1 * 4 = 4; got " + wool.getItem().getCount()
                     + " — ItemTags.WOOL may only cover white wool (dye-coverage bug)");
             return;
         }
@@ -251,8 +251,8 @@ public final class DropScalingGameTests {
     }
 
     /**
-     * Spec row: "kill weight-4 cow with fire-damage death → cooked beef +3,
-     * leather +3". Pins that {@link Items#COOKED_BEEF} is a recognised
+     * Spec row: "kill weight-4 cow with fire-damage death → cooked beef * 4,
+     * leather * 4". Pins that {@link Items#COOKED_BEEF} is a recognised
      * primary drop. Bug it catches: the handler only checking raw BEEF, so
      * a torch-spammed pen produces undifferentiated cooked drops.
      */
@@ -266,13 +266,13 @@ public final class DropScalingGameTests {
         // Use in-fire damage source for parity with the spec's fire-kill case.
         postDropsEvent(cow, drops, helper.getLevel().damageSources().inFire());
 
-        if (cooked.getItem().getCount() != 5) {
-            helper.fail("weight-4 cow (fire kill): cooked_beef expected 2 + 3 = 5; got "
+        if (cooked.getItem().getCount() != 8) {
+            helper.fail("weight-4 cow (fire kill): cooked_beef expected 2 * 4 = 8; got "
                     + cooked.getItem().getCount() + " — COOKED_BEEF not in primary drop set");
             return;
         }
         if (leather.getItem().getCount() != 4) {
-            helper.fail("weight-4 cow (fire kill): leather expected 1 + 3 = 4; got " + leather.getItem().getCount());
+            helper.fail("weight-4 cow (fire kill): leather expected 1 * 4 = 4; got " + leather.getItem().getCount());
             return;
         }
         helper.succeed();
@@ -330,8 +330,9 @@ public final class DropScalingGameTests {
     }
 
     /**
-     * Spec row: "kill weight-4 cow → XP +3". Pins that
-     * {@link DropScalingHandler#onLivingExperienceDrop} adds the bonus.
+     * Spec row: "kill weight-4 cow → XP * 4". Pins that
+     * {@link DropScalingHandler#onLivingExperienceDrop} multiplies dropped XP
+     * by the weight.
      */
     public static void killWeightFourCowXpGetsThreeBonus(GameTestHelper helper) {
         Cow cow = helper.spawnWithNoFreeWill(EntityType.COW, VICTIM_REL);
@@ -340,8 +341,8 @@ public final class DropScalingGameTests {
         LivingExperienceDropEvent xpEvent = new LivingExperienceDropEvent(cow, null, /* base */ 3);
         NeoForge.EVENT_BUS.post(xpEvent);
 
-        if (xpEvent.getDroppedExperience() != 6) {
-            helper.fail("weight-4 cow: XP expected 3 + 3 = 6; got " + xpEvent.getDroppedExperience());
+        if (xpEvent.getDroppedExperience() != 12) {
+            helper.fail("weight-4 cow: XP expected 3 * 4 = 12; got " + xpEvent.getDroppedExperience());
             return;
         }
         helper.succeed();

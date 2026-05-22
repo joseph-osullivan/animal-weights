@@ -2,22 +2,16 @@ package io.github.josephosullivan.animalweights.event;
 
 import io.github.josephosullivan.animalweights.AnimalWeightAttachment;
 import io.github.josephosullivan.animalweights.AnimalWeights;
-import io.github.josephosullivan.animalweights.AnimalWeightsTuning;
+import io.github.josephosullivan.animalweights.AnimalWeightsConfig;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Direction;
 import net.minecraft.gametest.framework.GameTestServer;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.world.entity.animal.Animal;
-import net.minecraft.world.entity.animal.chicken.Chicken;
-import net.minecraft.world.entity.animal.cow.AbstractCow;
-import net.minecraft.world.entity.animal.pig.Pig;
-import net.minecraft.world.entity.animal.rabbit.Rabbit;
-import net.minecraft.world.entity.animal.sheep.Sheep;
 import net.minecraft.world.level.Level;
 import net.minecraft.world.level.block.Blocks;
 import net.minecraft.world.level.entity.EntityTypeTest;
 import net.minecraft.world.level.material.Fluids;
-import net.minecraft.world.phys.AABB;
 import net.neoforged.bus.api.SubscribeEvent;
 import net.neoforged.fml.common.EventBusSubscriber;
 import net.neoforged.neoforge.event.tick.LevelTickEvent;
@@ -107,32 +101,49 @@ public final class DailyEvalHandler {
      * four conditions in {@code design.md} and applies the resulting weight
      * delta.
      *
-     * <p>Target species (post run-003): Cow, Pig, Sheep, Chicken, Rabbit, and
-     * Mooshroom. Mooshroom (vanilla {@code MushroomCow}) is auto-covered via
-     * the {@link AbstractCow} check because in MC 26.1 both {@code Cow} and
-     * {@code MushroomCow} extend {@code AbstractCow} (they are siblings, not
-     * parent/child as in pre-26.1 vanilla).
+     * <p>Target species is the
+     * {@link io.github.josephosullivan.animalweights.AnimalWeightsTags#TRACKED}
+     * entity-type tag — by default cow, mooshroom, pig, sheep, chicken,
+     * rabbit; extensible to modded animals via datapack contribution to the
+     * same tag.
      *
      * <p>Exposed for tests + manual triggering. Callers are responsible for
      * gating on dimension / time-of-day; this method just iterates and
      * applies.
      */
     public static void runEvaluation(ServerLevel level) {
-        // Pulls every loaded target species across the entire level. AbstractCow
-        // covers both vanilla Cow and MushroomCow (they share the abstract
-        // parent in MC 26.1; MushroomCow does NOT extend Cow).
+        // Pulls every loaded target species across the entire level. Membership
+        // is the AnimalWeightsTags.TRACKED entity-type tag (default: cow,
+        // mooshroom, pig, sheep, chicken, rabbit; extensible via datapack).
         List<? extends Animal> targets = level.getEntities(
                 EntityTypeTest.forClass(Animal.class),
-                entity -> entity instanceof AbstractCow || entity instanceof Pig
-                        || entity instanceof Sheep || entity instanceof Chicken
-                        || entity instanceof Rabbit);
+                AnimalWeightAttachment::isTracked);
 
+        // Perf fix #1: pre-compute the occupant set once instead of running a
+        // per-cell AABB entity scan inside the BFS. With N target animals the
+        // old code did ~N * BFS_CELLS getEntitiesOfClass calls on the dawn
+        // tick (each itself iterating chunk-section entity lists). Now it's
+        // one O(N) sweep over `targets`, then O(1) Set lookups in the BFS.
+        // Babies don't block cell walkability — they are evaluation-exempt and
+        // mob-pathfinding treats them as soft obstacles only — so we exclude
+        // them from `occupied`.
+        Set<BlockPos> occupied = new HashSet<>();
+        for (Animal a : targets) {
+            if (!a.isBaby()) {
+                occupied.add(a.blockPosition());
+            }
+        }
+
+        // Re-read the delta table once per evaluation pass instead of per
+        // mob — config reads cross a lock and TOML coercion shouldn't run on
+        // the hot per-mob loop.
+        int[] deltaTable = AnimalWeightsConfig.deltaByConditions();
         for (Animal mob : targets) {
             if (mob.isBaby()) {
                 continue; // babies don't carry weight gameplay; transient (20 min)
             }
-            int conditions = countConditionsMet(level, mob);
-            int delta = AnimalWeightsTuning.DELTA_BY_CONDITIONS[conditions];
+            int conditions = countConditionsMet(level, mob, occupied);
+            int delta = deltaTable[conditions];
             if (delta == 0) {
                 continue; // no-op; skip the attachment write
             }
@@ -143,43 +154,76 @@ public final class DailyEvalHandler {
 
     /**
      * Returns the count (0–4) of satisfied conditions for {@code mob}. This is
-     * the index into {@link AnimalWeightsTuning#DELTA_BY_CONDITIONS}.
+     * the index into the configured delta-by-conditions table (see
+     * {@link AnimalWeightsConfig.Server#deltaByConditions}).
      *
      * <p>Package-private for future test access without exposing
      * {@link #runEvaluation} internals.
      */
-    static int countConditionsMet(ServerLevel level, Animal mob) {
-        Set<BlockPos> reachable = computeReachable(level, mob);
+    static int countConditionsMet(ServerLevel level, Animal mob, Set<BlockPos> occupied) {
+        ReachabilityResult r = computeReachable(level, mob, occupied);
         int count = 0;
-        if (hasReachableLight(level, reachable)) count++;
-        if (hasReachableWaterSource(level, reachable)) count++;
-        if (hasReachableGrazingSurface(level, reachable)) count++;
-        if (reachable.size() >= AnimalWeightsTuning.MIN_ROAMING_CELLS) count++;
+        if (r.lightOK) count++;
+        if (r.waterOK) count++;
+        if (r.grazingOK) count++;
+        if (r.reachable.size() >= AnimalWeightsConfig.SERVER.minRoamingCells.get()) count++;
         return count;
+    }
+
+    /**
+     * Result of {@link #computeReachable(ServerLevel, Animal, Set)} — the set
+     * of reachable cells plus the three condition flags that were tested
+     * inline during BFS expansion.
+     */
+    static record ReachabilityResult(
+            Set<BlockPos> reachable,
+            boolean lightOK,
+            boolean waterOK,
+            boolean grazingOK) {
     }
 
     /**
      * BFS from the mob's standing block over horizontally-adjacent cells the
      * mob could walk to, treating fences / walls / solid blocks as obstacles
      * and other farm animals as blockers. Allows 1-block step up or down per
-     * move to handle stairs and uneven pens. Bounded by
-     * {@link AnimalWeightsTuning#ROAMING_MAX_BFS_CELLS} (compute cap) and by
-     * {@link AnimalWeightsTuning#EVAL_RADIUS_BLOCKS} (max chess-distance from
-     * the starting cell).
+     * move to handle stairs and uneven pens. Bounded by the configured
+     * {@code roaming_max_bfs_cells} (compute cap) and {@code eval_radius_blocks}
+     * (max chess-distance from the starting cell).
      *
      * <p>Subsumes the old "8-block AABB scan" approach for every condition —
      * a cow in a fenced pen can no longer count water sources on the far side
      * of the fence, matching the original Reddit concept's "can't pathfind to
      * light or water" wording.
+     *
+     * <p>Perf fix #4: the light / water-source / grazing-surface checks are
+     * folded into BFS expansion. Each cell, as it's discovered, contributes
+     * to the {@code lightOK / waterOK / grazingOK} flags. The BFS
+     * short-circuits as soon as all three flags are set AND the reachable
+     * set has reached the configured {@code min_roaming_cells} — at that
+     * point all four conditions are guaranteed satisfied and further BFS
+     * work would only refine numbers the caller never uses. Most well-kept
+     * pens hit this early-out in &lt;10 cells.
      */
-    static Set<BlockPos> computeReachable(ServerLevel level, Animal mob) {
+    static ReachabilityResult computeReachable(ServerLevel level, Animal mob, Set<BlockPos> occupied) {
         Set<BlockPos> visited = new HashSet<>();
         Deque<BlockPos> queue = new ArrayDeque<>();
         BlockPos start = mob.blockPosition();
         visited.add(start);
         queue.add(start);
-        int maxCells = AnimalWeightsTuning.ROAMING_MAX_BFS_CELLS;
-        int maxDist = AnimalWeightsTuning.EVAL_RADIUS_BLOCKS;
+
+        // Condition flags accumulated during BFS expansion. The start cell is
+        // evaluated up front; every cell added to `visited` afterwards is
+        // evaluated as it's added (see addCellChecks below).
+        boolean lightOK = checkLight(level, start);
+        boolean waterOK = checkWater(level, start);
+        boolean grazingOK = checkGrazing(level, start);
+        int minRoam = AnimalWeightsConfig.SERVER.minRoamingCells.get();
+        if (lightOK && waterOK && grazingOK && visited.size() >= minRoam) {
+            return new ReachabilityResult(visited, true, true, true);
+        }
+
+        int maxCells = AnimalWeightsConfig.SERVER.roamingMaxBfsCells.get();
+        int maxDist = AnimalWeightsConfig.SERVER.evalRadius.get();
         while (!queue.isEmpty() && visited.size() < maxCells) {
             BlockPos cur = queue.poll();
             for (Direction dir : Direction.Plane.HORIZONTAL) {
@@ -196,19 +240,37 @@ public final class DailyEvalHandler {
                             || Math.abs(next.getY() - start.getY()) > maxDist) {
                         continue;
                     }
-                    if (!isWalkableCell(level, next, mob)) {
+                    if (!isWalkableCell(level, next, occupied)) {
                         continue;
                     }
                     visited.add(next);
                     queue.add(next);
+
+                    // Fold post-BFS scans into expansion: evaluate the three
+                    // conditions at this newly-discovered cell.
+                    if (!lightOK && checkLight(level, next)) {
+                        lightOK = true;
+                    }
+                    if (!waterOK && checkWater(level, next)) {
+                        waterOK = true;
+                    }
+                    if (!grazingOK && checkGrazing(level, next)) {
+                        grazingOK = true;
+                    }
+                    // Short-circuit: all three conditions satisfied AND we
+                    // have enough roaming cells. The caller computes the
+                    // final count from these flags + reachable.size().
+                    if (lightOK && waterOK && grazingOK && visited.size() >= minRoam) {
+                        return new ReachabilityResult(visited, true, true, true);
+                    }
                     if (visited.size() >= maxCells) {
-                        return visited;
+                        return new ReachabilityResult(visited, lightOK, waterOK, grazingOK);
                     }
                     break;
                 }
             }
         }
-        return visited;
+        return new ReachabilityResult(visited, lightOK, waterOK, grazingOK);
     }
 
     private static final int[] DELTA_Y = { 0, -1, 1 };
@@ -217,8 +279,15 @@ public final class DailyEvalHandler {
      * A cell is walkable if it has a FULL-CUBE floor (excludes fence tops,
      * stairs, slabs — none of which a vanilla mob can actually stand on
      * cleanly), the cell itself + one above are clear of collision, and no
-     * OTHER farm animal currently occupies it. Self-occupation is ignored so
-     * the BFS starts validly at the mob's own position.
+     * OTHER farm animal currently occupies it. Self-occupation is implicitly
+     * handled by the BFS: the calling mob's start cell is seeded into
+     * {@code visited} before any walkability check runs, so this method
+     * never sees it.
+     *
+     * <p>Perf fix #1: occupant testing uses the pre-computed
+     * {@code occupied} set rather than a per-cell {@code getEntitiesOfClass}
+     * AABB scan. The set was built once at the top of
+     * {@link #runEvaluation(ServerLevel)}.
      *
      * <p>The full-cube check is the load-bearing constraint here: without it
      * the BFS happily strolls along the top of pen fences because the cell
@@ -227,7 +296,7 @@ public final class DailyEvalHandler {
      * fence's collision extends 0.5 above its base — but the BFS doesn't
      * model partial-block intrusion.
      */
-    private static boolean isWalkableCell(ServerLevel level, BlockPos pos, Animal self) {
+    private static boolean isWalkableCell(ServerLevel level, BlockPos pos, Set<BlockPos> occupied) {
         BlockPos below = pos.below();
         if (!level.getBlockState(below).isCollisionShapeFullBlock(level, below)) {
             return false;
@@ -239,47 +308,28 @@ public final class DailyEvalHandler {
         if (!level.getBlockState(above).getCollisionShape(level, above).isEmpty()) {
             return false;
         }
-        AABB cellBox = new AABB(pos);
-        List<Animal> others = level.getEntitiesOfClass(Animal.class, cellBox,
-                a -> a != self && (a instanceof AbstractCow || a instanceof Pig
-                        || a instanceof Sheep || a instanceof Chicken
-                        || a instanceof Rabbit));
-        return others.isEmpty();
+        return !occupied.contains(pos);
     }
 
-    private static boolean hasReachableLight(ServerLevel level, Set<BlockPos> reachable) {
-        for (BlockPos pos : reachable) {
-            if (level.getMaxLocalRawBrightness(pos) >= AnimalWeightsTuning.LIGHT_THRESHOLD) {
-                return true;
-            }
-        }
-        return false;
+    private static boolean checkLight(ServerLevel level, BlockPos pos) {
+        return level.getMaxLocalRawBrightness(pos) >= AnimalWeightsConfig.SERVER.lightThreshold.get();
     }
 
     /**
-     * "Water source nearby" — path-restricted: a water source block OR a
-     * filled water cauldron ({@code Blocks.WATER_CAULDRON}, which covers
-     * both bucket-filled and rain-filled) must sit as a horizontal neighbour
-     * of at least one cell in the mob's reachable set, at the same Y level
-     * OR one block below ("sunken trough" / pond carved one block deep into
-     * the ground — the mob leans down to drink).
-     *
-     * <p>The reachability requirement means a cauldron inside the pen counts
-     * (its neighbouring grass cells are reachable, the cauldron is their
-     * neighbour) but the ocean on the other side of a fence does not (the
-     * mob can't BFS past the fence so no reachable cell is adjacent to the
-     * water beyond it).
+     * "Water source nearby" predicate for a single cell — checks horizontal
+     * neighbours at the same Y and one Y below for water source OR filled
+     * water cauldron. Matches the semantics of the old
+     * {@code hasReachableWaterSource} post-BFS scan, applied per cell so it
+     * can be folded into BFS expansion.
      */
-    private static boolean hasReachableWaterSource(ServerLevel level, Set<BlockPos> reachable) {
-        for (BlockPos pos : reachable) {
-            for (Direction dir : Direction.Plane.HORIZONTAL) {
-                BlockPos neighbour = pos.relative(dir);
-                if (isWaterOrFilledCauldron(level, neighbour)) {
-                    return true;
-                }
-                if (isWaterOrFilledCauldron(level, neighbour.below())) {
-                    return true;
-                }
+    private static boolean checkWater(ServerLevel level, BlockPos pos) {
+        for (Direction dir : Direction.Plane.HORIZONTAL) {
+            BlockPos neighbour = pos.relative(dir);
+            if (isWaterOrFilledCauldron(level, neighbour)) {
+                return true;
+            }
+            if (isWaterOrFilledCauldron(level, neighbour.below())) {
+                return true;
             }
         }
         return false;
@@ -293,14 +343,9 @@ public final class DailyEvalHandler {
         return level.getBlockState(pos).is(Blocks.WATER_CAULDRON);
     }
 
-    private static boolean hasReachableGrazingSurface(ServerLevel level, Set<BlockPos> reachable) {
-        for (BlockPos pos : reachable) {
-            var below = level.getBlockState(pos.below()).getBlock();
-            if (below == Blocks.GRASS_BLOCK || below == Blocks.MOSS_BLOCK) {
-                return true;
-            }
-        }
-        return false;
+    private static boolean checkGrazing(ServerLevel level, BlockPos pos) {
+        var below = level.getBlockState(pos.below()).getBlock();
+        return below == Blocks.GRASS_BLOCK || below == Blocks.MOSS_BLOCK;
     }
 
 }

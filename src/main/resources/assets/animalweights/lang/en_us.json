@@ -1,2 +1,6 @@
 {
+  "animalweights.command.info": "%s — weight %s — sick: %s",
+  "animalweights.command.set": "%s weight set to %s",
+  "animalweights.command.sick.yes": "yes",
+  "animalweights.command.sick.no": "no"
 }

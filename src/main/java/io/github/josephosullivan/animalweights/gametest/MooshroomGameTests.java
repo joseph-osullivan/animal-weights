@@ -124,9 +124,9 @@ public final class MooshroomGameTests {
 
     /**
      * Spec: "kill_weight_four_mooshroom_drops_three_extra_beef_and_leather" —
-     * Mooshroom shares Cow's primary drop set; at weight 4, beef + 3 and
-     * leather + 3. Bug it catches: handler uses {@code instanceof Cow},
-     * dropping Mooshroom kills back to vanilla counts.
+     * Mooshroom shares Cow's primary drop set; at weight 4, multiplicative
+     * scaling yields beef * 4 and leather * 4. Bug it catches: handler uses
+     * {@code instanceof Cow}, dropping Mooshroom kills back to vanilla counts.
      */
     public static void killWeightFourMooshroomDropsThreeExtraBeefAndLeather(GameTestHelper helper) {
         MushroomCow mooshroom = helper.spawnWithNoFreeWill(EntityType.MOOSHROOM, VICTIM_REL);
@@ -138,14 +138,14 @@ public final class MooshroomGameTests {
         NeoForge.EVENT_BUS.post(new LivingDropsEvent(mooshroom,
                 helper.getLevel().damageSources().generic(), drops, true));
 
-        if (beef.getItem().getCount() != 5) {
-            helper.fail("weight-4 mooshroom: beef expected 2 + 3 = 5; got "
+        if (beef.getItem().getCount() != 8) {
+            helper.fail("weight-4 mooshroom: beef expected 2 * 4 = 8; got "
                     + beef.getItem().getCount() + " — DropScalingHandler may still gate on instanceof Cow; "
                     + "Mooshroom is a sibling not subclass in MC 26.1");
             return;
         }
         if (leather.getItem().getCount() != 4) {
-            helper.fail("weight-4 mooshroom: leather expected 1 + 3 = 4; got "
+            helper.fail("weight-4 mooshroom: leather expected 1 * 4 = 4; got "
                     + leather.getItem().getCount());
             return;
         }

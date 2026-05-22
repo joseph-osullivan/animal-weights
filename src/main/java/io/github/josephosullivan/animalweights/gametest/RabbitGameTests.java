@@ -202,7 +202,7 @@ public final class RabbitGameTests {
 
     /**
      * Spec: "kill_weight_four_rabbit_drops_three_extra_raw_rabbit_and_hide" —
-     * weight 4 → bonus 3 → raw_rabbit + 3, rabbit_hide + 3.
+     * weight 4 → multiplicative scaling → raw_rabbit * 4, rabbit_hide * 4.
      */
     public static void killWeightFourRabbitDropsThreeExtraRawRabbitAndHide(GameTestHelper helper) {
         Rabbit rabbit = helper.spawnWithNoFreeWill(EntityType.RABBIT, VICTIM_REL);
@@ -215,12 +215,12 @@ public final class RabbitGameTests {
                 helper.getLevel().damageSources().generic(), drops, true));
 
         if (raw.getItem().getCount() != 4) {
-            helper.fail("weight-4 rabbit: raw_rabbit expected 1 + 3 = 4; got "
+            helper.fail("weight-4 rabbit: raw_rabbit expected 1 * 4 = 4; got "
                     + raw.getItem().getCount() + " — RABBIT missing from primary drop set");
             return;
         }
         if (hide.getItem().getCount() != 4) {
-            helper.fail("weight-4 rabbit: rabbit_hide expected 1 + 3 = 4; got "
+            helper.fail("weight-4 rabbit: rabbit_hide expected 1 * 4 = 4; got "
                     + hide.getItem().getCount() + " — RABBIT_HIDE missing from primary drop set");
             return;
         }
@@ -230,10 +230,10 @@ public final class RabbitGameTests {
     /**
      * Spec: "kill_weight_four_rabbit_does_not_amplify_rabbit_foot" — the
      * critical guard. Construct a drops list that includes a {@code RABBIT_FOOT}
-     * stack (simulating a successful 10% roll). Even at weight 4 (bonus 3),
-     * the foot stack count must stay at 1 because RABBIT_FOOT is NOT in the
-     * rabbit primary drop set. Pins that weight is not a Looting amplifier on
-     * rare drops.
+     * stack (simulating a successful 10% roll). Even at weight 4 (multiplicative
+     * scale x4), the foot stack count must stay at 1 because RABBIT_FOOT is NOT
+     * in the rabbit primary drop set. Pins that weight is not a Looting
+     * amplifier on rare drops.
      */
     public static void killWeightFourRabbitDoesNotAmplifyRabbitFoot(GameTestHelper helper) {
         Rabbit rabbit = helper.spawnWithNoFreeWill(EntityType.RABBIT, VICTIM_REL);
@@ -247,7 +247,7 @@ public final class RabbitGameTests {
 
         // The always-rolled primary should still scale.
         if (raw.getItem().getCount() != 4) {
-            helper.fail("weight-4 rabbit: raw_rabbit expected 1 + 3 = 4; got "
+            helper.fail("weight-4 rabbit: raw_rabbit expected 1 * 4 = 4; got "
                     + raw.getItem().getCount() + " — primary drop scaling regressed");
             return;
         }
@@ -262,8 +262,9 @@ public final class RabbitGameTests {
     }
 
     /**
-     * Spec: "kill_weight_eight_rabbit_drops_seven_extra" — original linear
-     * formula expected +7. Updated for run-004 curve: w=8 → +11.
+     * Spec: "kill_weight_eight_rabbit_drops_seven_extra" — multiplicative
+     * scaling means weight 8 yields {@code count * 8}. With a baseline of 1
+     * each, the resulting counts are 8 each.
      */
     public static void killWeightEightRabbitDropsSevenExtra(GameTestHelper helper) {
         Rabbit rabbit = helper.spawnWithNoFreeWill(EntityType.RABBIT, VICTIM_REL);
@@ -275,13 +276,13 @@ public final class RabbitGameTests {
         NeoForge.EVENT_BUS.post(new LivingDropsEvent(rabbit,
                 helper.getLevel().damageSources().generic(), drops, true));
 
-        if (raw.getItem().getCount() != 12) {
-            helper.fail("weight-8 rabbit: raw_rabbit expected 1 + 11 = 12 (run-004 curve); got "
+        if (raw.getItem().getCount() != 8) {
+            helper.fail("weight-8 rabbit: raw_rabbit expected 1 * 8 = 8 (multiplicative); got "
                     + raw.getItem().getCount());
             return;
         }
-        if (hide.getItem().getCount() != 12) {
-            helper.fail("weight-8 rabbit: rabbit_hide expected 1 + 11 = 12 (run-004 curve); got "
+        if (hide.getItem().getCount() != 8) {
+            helper.fail("weight-8 rabbit: rabbit_hide expected 1 * 8 = 8 (multiplicative); got "
                     + hide.getItem().getCount());
             return;
         }

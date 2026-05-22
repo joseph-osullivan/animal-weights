@@ -460,4 +460,66 @@ public final class ModGameTests {
             XP_AT_WEIGHT_EIGHT_USES_SAME_CURVE = TEST_FUNCTIONS.register(
             "xp_at_weight_eight_uses_same_curve",
             () -> DropCurveGameTests::xpAtWeightEightUsesSameCurve);
+
+    // ----------------------------------------------------------------------
+    // Run-005: v0.2.0 parity additions
+    // ----------------------------------------------------------------------
+
+    // Display overlay (task-5) — DisplayOverlayHandler.
+    // overlay_is_not_saved_to_disk is deferred to manual playtest: it requires
+    // a chunk-reload boundary that a single-tick GameTest cell cannot reproduce.
+    public static final DeferredHolder<Consumer<GameTestHelper>, Consumer<GameTestHelper>>
+            TARGET_SPECIES_ANIMAL_GETS_OVERLAY_TEXT_DISPLAY = TEST_FUNCTIONS.register(
+            "target_species_animal_gets_overlay_text_display",
+            () -> DisplayOverlayGameTests::targetSpeciesAnimalGetsOverlayTextDisplay);
+
+    public static final DeferredHolder<Consumer<GameTestHelper>, Consumer<GameTestHelper>>
+            OVERLAY_DESPAWNS_ON_ANIMAL_DEATH = TEST_FUNCTIONS.register(
+            "overlay_despawns_on_animal_death",
+            () -> DisplayOverlayGameTests::overlayDespawnsOnAnimalDeath);
+
+    // Wander-to-habitat goal (task-6) — WanderToHabitatGoal + HabitatGoalInstaller.
+    public static final DeferredHolder<Consumer<GameTestHelper>, Consumer<GameTestHelper>>
+            ADULT_COW_HAS_HABITAT_GOAL_INSTALLED_ON_SPAWN = TEST_FUNCTIONS.register(
+            "adult_cow_has_habitat_goal_installed_on_spawn",
+            () -> WanderHabitatGoalGameTests::adultCowHasHabitatGoalInstalledOnSpawn);
+
+    public static final DeferredHolder<Consumer<GameTestHelper>, Consumer<GameTestHelper>>
+            BABY_COW_DOES_NOT_HAVE_HABITAT_GOAL_INSTALLED = TEST_FUNCTIONS.register(
+            "baby_cow_does_not_have_habitat_goal_installed",
+            () -> WanderHabitatGoalGameTests::babyCowDoesNotHaveHabitatGoalInstalled);
+
+    // Weakness mob effect (task-7) — second sick effect alongside Slowness.
+    public static final DeferredHolder<Consumer<GameTestHelper>, Consumer<GameTestHelper>>
+            WEIGHT_ZERO_TARGET_SPECIES_GETS_BOTH_SLOWNESS_AND_WEAKNESS = TEST_FUNCTIONS.register(
+            "weight_zero_target_species_gets_both_slowness_and_weakness",
+            () -> WeaknessEffectGameTests::weightZeroTargetSpeciesGetsBothSlownessAndWeakness);
+
+    public static final DeferredHolder<Consumer<GameTestHelper>, Consumer<GameTestHelper>>
+            WEIGHT_ONE_TARGET_SPECIES_GETS_NEITHER_SLOWNESS_NOR_WEAKNESS = TEST_FUNCTIONS.register(
+            "weight_one_target_species_gets_neither_slowness_nor_weakness",
+            () -> WeaknessEffectGameTests::weightOneTargetSpeciesGetsNeitherSlownessNorWeakness);
+
+    // Village/water passive bonus (task-8) — DropScalingHandler.isNearVillageOrWater.
+    // Village-proximity coverage is deferred to manual playtest (POI setup is
+    // impractical in a GameTest cell). Water side of the OR clause is covered here.
+    public static final DeferredHolder<Consumer<GameTestHelper>, Consumer<GameTestHelper>>
+            KILL_WEIGHT_ONE_COW_NEAR_WATER_DROPS_ONE_EXTRA_BEEF = TEST_FUNCTIONS.register(
+            "kill_weight_one_cow_near_water_drops_one_extra_beef",
+            () -> VillageWaterBonusGameTests::killWeightOneCowNearWaterDropsOneExtraBeef);
+
+    public static final DeferredHolder<Consumer<GameTestHelper>, Consumer<GameTestHelper>>
+            KILL_WEIGHT_ONE_COW_AWAY_FROM_WATER_DROPS_VANILLA = TEST_FUNCTIONS.register(
+            "kill_weight_one_cow_away_from_water_drops_vanilla",
+            () -> VillageWaterBonusGameTests::killWeightOneCowAwayFromWaterDropsVanilla);
+
+    public static final DeferredHolder<Consumer<GameTestHelper>, Consumer<GameTestHelper>>
+            KILL_WEIGHT_ZERO_COW_NEAR_WATER_GETS_NO_VILLAGE_BONUS = TEST_FUNCTIONS.register(
+            "kill_weight_zero_cow_near_water_gets_no_village_bonus",
+            () -> VillageWaterBonusGameTests::killWeightZeroCowNearWaterGetsNoVillageBonus);
+
+    public static final DeferredHolder<Consumer<GameTestHelper>, Consumer<GameTestHelper>>
+            KILL_WEIGHT_FOUR_COW_NEAR_WATER_DROPS_MULTIPLICATIVE_PLUS_ONE = TEST_FUNCTIONS.register(
+            "kill_weight_four_cow_near_water_drops_multiplicative_plus_one",
+            () -> VillageWaterBonusGameTests::killWeightFourCowNearWaterDropsMultiplicativePlusOne);
 }
